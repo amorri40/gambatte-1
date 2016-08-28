@@ -21,6 +21,8 @@
 #include <cstring>
 #include <fstream>
 #include <stdio.h>
+#include <string.h>
+#include <emscripten.h>
 
 namespace gambatte
 {
@@ -76,7 +78,7 @@ namespace gambatte
       unsigned char rambank;
       bool enableRam;
       bool rambankMode;
-      static unsigned adjustedRombank(unsigned bank) { return bank & 0x1F ? bank : bank | 1; }
+      static unsigned adjustedRombank(unsigned bank) { return (bank & 0x1F) ? bank : bank | 1; }
       void setRambank() const { memptrs.setRambank(enableRam ? MemPtrs::READ_EN | MemPtrs::WRITE_EN : 0, rambank & (rambanks(memptrs) - 1)); }
       void setRombank() const { memptrs.setRombank(adjustedRombank(rombank) & (rombanks(memptrs) - 1)); }
       public:
@@ -134,7 +136,7 @@ namespace gambatte
       unsigned char rombank;
       bool enableRam;
       bool rombank0Mode;
-      static unsigned adjustedRombank(unsigned bank) { return bank & 0x1F ? bank : bank | 1; }
+      static unsigned adjustedRombank(unsigned bank) { return (bank & 0x1F) ? bank : bank | 1; }
       void setRombank() const {
          if (rombank0Mode) {
             const unsigned rb = toMulti64Rombank(rombank);
@@ -342,17 +344,29 @@ namespace gambatte
          setRombank();
       }
    };
+   // 
+   // # Mbc5 is used for rugrats
+   // 
    class Mbc5 : public DefaultMbc {
       MemPtrs &memptrs;
       unsigned short rombank;
       unsigned char rambank;
       bool enableRam;
-      static unsigned adjustedRombank(const unsigned bank) { return bank ? bank : 1; }
+      static unsigned adjustedRombank(const unsigned bank) { return bank; }
       void setRambank() const {
+         EM_ASM_INT({
+           window.setRambank($0,$1,$2,$3);
+         }, enableRam, rambank, rambanks(memptrs), rambank & (rambanks(memptrs) - 1) );
          memptrs.setRambank(enableRam ? MemPtrs::READ_EN | MemPtrs::WRITE_EN : 0,
                rambank & (rambanks(memptrs) - 1));
       }
-      void setRombank() const { memptrs.setRombank(adjustedRombank(rombank) & (rombanks(memptrs) - 1));}
+      void setRombank() const { 
+         EM_ASM_INT({
+           window.setRombank($0, $1);
+         }, rombank, adjustedRombank(rombank) & (rombanks(memptrs) - 1));
+         //printf("setRombank called. %d adjusted: %d rombanks: %d \n", rombank, adjustedRombank(rombank), rombanks(memptrs));
+         // printf("Rmem: retro.core.HEAPU8[%d] First byte: %d Size: %d Hex: %#1x %s \n",*memptrs.rmem_, sizeof(**memptrs.rmem_), sizeof( memptrs.rmem_), (*memptrs.rmem_)[0], memptrs.rmem_);
+         memptrs.setRombank(adjustedRombank(rombank) & (rombanks(memptrs) - 1));}
       public:
       explicit Mbc5(MemPtrs &memptrs)
          : memptrs(memptrs),
@@ -362,6 +376,9 @@ namespace gambatte
       {
       }
       virtual void romWrite(const unsigned P, const unsigned data) {
+         EM_ASM_INT({
+           window.romWrite($0, $1, $2);
+         }, P, P >> 13 & 3, data);
          switch (P >> 13 & 3) {
             case 0:
                enableRam = (data & 0xF) == 0xA;
@@ -531,6 +548,13 @@ namespace gambatte
       mbc.reset();
       memptrs_.reset(rombanks, rambanks, cgb ? 8 : 2);
       rtc_.set(false, 0);
+
+      EM_ASM_INT({
+            // $0 = destination
+         // $1 = source
+         // $2 = size
+           window.loadRomInfo($0, $1, $2);
+         }, memptrs_.romdata(), romdata, ((romsize / 0x4000) * 0x4000ul) * sizeof(unsigned char));
 
       memcpy(memptrs_.romdata(), romdata, ((romsize / 0x4000) * 0x4000ul) * sizeof(unsigned char));
       std::memset(memptrs_.romdata() + (romsize / 0x4000) * 0x4000ul, 0xFF, (rombanks - romsize / 0x4000) * 0x4000ul);

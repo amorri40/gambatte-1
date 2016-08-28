@@ -71,6 +71,11 @@ namespace gambatte
       setWrambank(1);
    }
 
+   //    
+   // rom_data_ array contains 2 elements
+   //  * each element is a game boy memory bank
+   //  * they are pointers to the currently set banks memory on the emscripten heap
+   // 
    void MemPtrs::setRombank0(const unsigned bank)
    {
       romdata_[0] = romdata() + bank * 0x4000ul;
@@ -87,13 +92,13 @@ namespace gambatte
 
    void MemPtrs::setRambank(const unsigned flags, const unsigned rambank)
    {
-      unsigned char *const srambankptr = flags & RTC_EN
+      unsigned char *const srambankptr = (flags & RTC_EN)
          ? 0
          : (rambankdata() != rambankdataend()
                ? rambankdata_ + rambank * 0x2000ul - 0xA000 : wdisabledRam() - 0xA000);
 
       rsrambankptr_ = (flags & READ_EN) && srambankptr != wdisabledRam() - 0xA000 ? srambankptr : rdisabledRamw() - 0xA000;
-      wsrambankptr_ = flags & WRITE_EN ? srambankptr : wdisabledRam() - 0xA000;
+      wsrambankptr_ = (flags & WRITE_EN) ? srambankptr : wdisabledRam() - 0xA000;
       rmem_[0xB] = rmem_[0xA] = rsrambankptr_;
       wmem_[0xB] = wmem_[0xA] = wsrambankptr_;
       disconnectOamDmaAreas();

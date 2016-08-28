@@ -1,9 +1,5 @@
 DEBUG = 0
 
-ifneq ($(EMSCRIPTEN),)
-	platform = emscripten
-endif
-
 ifeq ($(platform),)
 	platform = unix
 	ifeq ($(shell uname -a),)
@@ -30,6 +26,14 @@ endif
 
 TARGET_NAME := gambatte
 
+ifeq ($(ARCHFLAGS),)
+ifeq ($(archs),ppc)
+   ARCHFLAGS = -arch ppc -arch ppc64
+else
+   ARCHFLAGS = -arch i386 -arch x86_64
+endif
+endif
+
 # Unix
 ifeq ($(platform), unix)
 	TARGET := $(TARGET_NAME)_libretro.so
@@ -43,9 +47,7 @@ else ifeq ($(platform), osx)
 	SHARED := -dynamiclib
 	OSXVER = `sw_vers -productVersion | cut -d. -f 2`
 	OSX_LT_MAVERICKS = `(( $(OSXVER) <= 9)) && echo "YES"`
-	ifeq ($(OSX_LT_MAVERICKS),"YES")
-		fpic += -mmacosx-version-min=10.5
-	endif
+	#fpic += -mmacosx-version-min=10.1
 	ifndef ($(NOUNIVERSAL))
 		CFLAGS += $(ARCHFLAGS)
 		CXXFLAGS += $(ARCHFLAGS)
@@ -53,22 +55,25 @@ else ifeq ($(platform), osx)
 	endif
 
 # iOS
-else ifeq ($(platform), ios)
+else ifneq (,$(findstring ios,$(platform)))
+
 	TARGET := $(TARGET_NAME)_libretro_ios.dylib
 	fpic := -fPIC
 	SHARED := -dynamiclib
 	ifeq ($(IOSSDK),)
 		IOSSDK := $(shell xcodebuild -version -sdk iphoneos Path)
 	endif
-	CC = clang -arch armv7 -isysroot $(IOSSDK)
-	CXX = clang++ -arch armv7 -isysroot $(IOSSDK)
-	OSXVER = `sw_vers -productVersion | cut -d. -f 2`
-	OSX_LT_MAVERICKS = `(( $(OSXVER) <= 9)) && echo "YES"`
-	ifeq ($(OSX_LT_MAVERICKS),"YES")
-		CC += -miphoneos-version-min=5.0
-		CXX += -miphoneos-version-min=5.0
-		PLATFORM_DEFINES := -miphoneos-version-min=5.0
-	endif
+	CC = cc -arch armv7 -isysroot $(IOSSDK)
+	CXX = c++ -arch armv7 -isysroot $(IOSSDK)
+ifeq ($(platform),ios9)
+	CC += -miphoneos-version-min=8.0
+	CXX += -miphoneos-version-min=8.0
+	PLATFORM_DEFINES := -miphoneos-version-min=8.0
+else
+	CC += -miphoneos-version-min=5.0
+	CXX += -miphoneos-version-min=5.0
+	PLATFORM_DEFINES := -miphoneos-version-min=5.0
+endif
 
 # Theos
 else ifeq ($(platform), theos_ios)
@@ -126,6 +131,17 @@ else ifeq ($(platform), psp1)
 	PLATFORM_DEFINES := -DPSP -DCC_RESAMPLER
 	CFLAGS += -G0
 	CXXFLAGS += -G0
+	STATIC_LINKING = 1
+
+# Vita
+else ifeq ($(platform), vita)
+	TARGET := $(TARGET_NAME)_libretro_vita.a
+	CC = arm-vita-eabi-gcc$(EXE_EXT)
+	CXX = arm-vita-eabi-g++$(EXE_EXT)
+	AR = arm-vita-eabi-ar$(EXE_EXT)
+	PLATFORM_DEFINES := -DCC_RESAMPLER
+	CFLAGS += -DVITA
+	CXXFLAGS += -DVITA
 	STATIC_LINKING = 1
 
 # CTR(3DS)
@@ -239,6 +255,14 @@ ${LIBRARY_NAME}_FILES = $(SOURCES_CXX) $(SOURCES_C)
 include $(THEOS_MAKE_PATH)/library.mk
 else
 all: $(TARGET)
+
+ifeq ($(platform), osx)
+ifndef ($(NOUNIVERSAL))
+   CFLAGS += $(ARCHFLAGS)
+   CXXFLAGS += $(ARCHFLAGS)
+   LFLAGS += $(ARCHFLAGS)
+endif
+endif
 
 $(TARGET): $(OBJS)
 ifeq ($(STATIC_LINKING), 1)
