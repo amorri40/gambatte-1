@@ -130,9 +130,16 @@ namespace gambatte
          void setWrambank(unsigned bank);
          void setOamDmaSrc(OamDmaSrc oamDmaSrc);
 
-      private:
+         //    
+         // # rom_data_ array contains 2 elements
+         //  * each element is a game boy memory bank
+         //  * they are pointers to the currently set banks memory on the emscripten heap
+         // 
          unsigned char *romdata_[2];
          unsigned char *wramdata_[2];
+         // 
+         // 
+         // 
          const unsigned char *rmem_[0x10];
          unsigned char *wmem_[0x10];
          unsigned char *vrambankptr_;
@@ -141,6 +148,9 @@ namespace gambatte
          unsigned char *memchunk_;
          unsigned char *rambankdata_;
          unsigned char *wramdataend_;
+
+      private:
+         
          OamDmaSrc oamDmaSrc_;
          MemPtrs(const MemPtrs &);
          MemPtrs & operator=(const MemPtrs &);

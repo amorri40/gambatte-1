@@ -72,7 +72,20 @@ public:
 		return p < 0x80 ? nontrivial_ff_read(p, cc) : ioamhram_[p + 0x100];
 	}
 
+	// 
+	// Read memory
+	// * Check if the pointer memory address is within the cart range
+	//    * To do this we use a right shift to remove the last 12 bits
+	//      * this then brings in 12 bits to the left which are the same value as the previous left most bit
+	// * This checks if the value is very large (i.e greater than 65298) 
+	//   * if the number is greater than 12 bits can hold then it will be a nontrivial_read
+	// * cc is the CycleCounter and is only needed for non trivial reads as they take more cpu cycles
+	// 
 	unsigned read(unsigned p, unsigned long cc) {
+		if (cart_.rmem(p >> 12))
+		EM_ASM_INT({
+           window.trivialReadMemory($0, $1, $2, $3);
+         }, p, cart_.rmem(p >> 12), &(cart_.rmem(p >> 12)[p]), cart_.rmem(p >> 12)[p]);
 		return cart_.rmem(p >> 12) ? cart_.rmem(p >> 12)[p] : nontrivial_read(p, cc);
 	}
 

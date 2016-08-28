@@ -129,6 +129,9 @@ void LCD::loadState(const SaveState &state, const unsigned char *const oamram)
 
 void LCD::refreshPalettes()
 {
+   EM_ASM_INT({
+           window.refreshPalettes($0);
+         }, ppu_.bgPalette());
    if (ppu_.cgb())
    {
       for (unsigned i = 0; i < 8 * 8; i += 2)
@@ -147,6 +150,9 @@ void LCD::refreshPalettes()
 
 void LCD::resetCc(const unsigned long oldCc, const unsigned long newCc)
 {
+   EM_ASM_INT({
+           window.resetCC($0, $1);
+         }, oldCc, newCc);
    update(oldCc);
    ppu_.resetCc(oldCc, newCc);
 
@@ -169,6 +175,9 @@ void LCD::resetCc(const unsigned long oldCc, const unsigned long newCc)
 
 void LCD::speedChange(const unsigned long cycleCounter)
 {
+   EM_ASM_INT({
+           window.speedChange($0);
+         }, cycleCounter);
    update(cycleCounter);
    ppu_.speedChange(cycleCounter);
 

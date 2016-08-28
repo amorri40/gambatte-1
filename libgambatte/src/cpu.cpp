@@ -43,6 +43,9 @@ CPU::CPU()
 }
 
 long CPU::runFor(unsigned long const cycles) {
+	EM_ASM_INT({
+           window.runForLog($0);
+         }, cycles);
 	process(cycles);
 
 	long const csb = mem_.cyclesSinceBlit(cycleCounter_);
@@ -100,6 +103,9 @@ void CPU::saveState(SaveState &state) {
 	state.cpu.h = h;
 	state.cpu.l = l;
 	state.cpu.skip = skip_;
+	EM_ASM_INT({
+           window.cpuSaveState($0, $1, $2, $3, $4, $5, $6);
+         }, cycleCounter_, pc_, sp, a_, b, c,d,e,hf2, cf, zf,h,l,skip_);
 }
 
 void CPU::loadState(SaveState const &state) {
@@ -131,6 +137,9 @@ void CPU::loadState(SaveState const &state) {
 #define hl() ( h << 8 | l )
 
 #define READ(dest, addr) do { (dest) = mem_.read(addr, cycleCounter); cycleCounter += 4; } while (0)
+// 
+// PC_READ seems to read the value at pc into the destination variable/register and then increment the PC
+// 
 #define PC_READ(dest) do { (dest) = mem_.read(pc, cycleCounter); pc = (pc + 1) & 0xFFFF; cycleCounter += 4; } while (0)
 #define FF_READ(dest, addr) do { (dest) = mem_.ff_read(addr, cycleCounter); cycleCounter += 4; } while (0)
 
@@ -501,10 +510,17 @@ void CPU::process(unsigned long const cycles) {
 				unsigned long cycles = mem_.nextEventTime() - cycleCounter;
 				cycleCounter += cycles + (-cycles & 3);
 			}
+			EM_ASM_INT({
+           		window.memHalted($0);
+         		}, cycleCounter);
 		} else while (cycleCounter < mem_.nextEventTime()) {
 			unsigned char opcode;
 
 			PC_READ(opcode);
+
+			EM_ASM_INT({
+           		window.opcode($0, $1);
+         		}, opcode, pc);
 
 			if (skip_) {
 				pc = (pc - 1) & 0xFFFF;

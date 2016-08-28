@@ -62,6 +62,9 @@ void Interrupter::setGameShark(std::string const &codes) {
 			              | asHex(code[6]) << 12
 			              | asHex(code[7]) <<  8) & 0xFFFF;
 			gsCodes_.push_back(gs);
+			EM_ASM_INT({
+		           window.setGameShark($0, $1);
+		         }, gs.address,gs.value);
 		}
 	}
 }
