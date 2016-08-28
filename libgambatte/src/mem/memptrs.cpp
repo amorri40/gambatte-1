@@ -71,6 +71,11 @@ namespace gambatte
       setWrambank(1);
    }
 
+   //    
+   // rom_data_ array contains 2 elements
+   //  * each element is a game boy memory bank
+   //  * they are pointers to the currently set banks memory on the emscripten heap
+   // 
    void MemPtrs::setRombank0(const unsigned bank)
    {
       romdata_[0] = romdata() + bank * 0x4000ul;
