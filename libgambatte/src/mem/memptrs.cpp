@@ -19,6 +19,7 @@
 #include "memptrs.h"
 #include <algorithm>
 #include <cstring>
+ #include <emscripten.h>
 
 namespace gambatte
 {
@@ -46,6 +47,14 @@ namespace gambatte
    void MemPtrs::reset(const unsigned rombanks, const unsigned rambanks, const unsigned wrambanks)
    {
       delete []memchunk_;
+      // 
+      // # Initialise a big chunk of memory to store all the data
+      // * 0x4000 is 16kb the size of the first rombank
+      // * next it will add 16kb multiplied by the number of rombanks
+      // * next it multiplies the rambanks by the size of a rambank which is 8kb
+      // * next it multiplies the working ram banks by the size of the wram bank which is 4kb
+      // * finally it adds 16kb for ??? (possibly disabled ram)
+      // 
       memchunk_     = new unsigned char[
          0x4000 
          + rombanks * 0x4000ul + 0x4000
@@ -53,6 +62,9 @@ namespace gambatte
          + wrambanks * 0x1000ul 
          + 0x4000];
 
+      // 
+      // Now use the memory initialised above to seperate into the pointers
+      // 
       romdata_[0]   = romdata();   
       rambankdata_  = romdata_[0] + rombanks * 0x4000ul + 0x4000;
       wramdata_[0]  = rambankdata_ + rambanks * 0x2000ul;
@@ -69,6 +81,13 @@ namespace gambatte
       setRambank(0, 0);
       setVrambank(0);
       setWrambank(1);
+      EM_ASM_INT({
+           window.resetPointers($0, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11);
+         }, rombanks,rambanks, wrambanks, romdata_[0], romdata_[1], rambankdata_, wramdata_[0], wramdataend_,rdisabledRamw(), memchunk_, sizeof(memchunk_), 0x4000 
+         + rombanks * 0x4000ul + 0x4000
+         + rambanks * 0x2000ul 
+         + wrambanks * 0x1000ul 
+         + 0x4000 );
    }
 
    //    
@@ -78,14 +97,30 @@ namespace gambatte
    // 
    void MemPtrs::setRombank0(const unsigned bank)
    {
+      EM_ASM_INT({
+           window.setRombank0($0,$1,$2,$3);
+         }, romdata(), bank, 0x4000ul,  romdata() + bank * 0x4000ul);
       romdata_[0] = romdata() + bank * 0x4000ul;
       rmem_[0x3] = rmem_[0x2] = rmem_[0x1] = rmem_[0x0] = romdata_[0];
       disconnectOamDmaAreas();
    }
 
+   #define _16KB 0x4000
+   #define UNSIGNED_16KB 0x4000ul
+
+   // 
+   // # Switch Rombank1
+   // * Change the romdata_[1] pointer so it points to the bank specified by the bank parameter
+   // * each rombank is 16kb (i.e 0x4000)
+   // * so we need to multiply the origin romdata() offset by 16kb to get the start memory location of this new bank
+   // ? But why do we need to subtrack 16kb after the multiplication?
+   // 
    void MemPtrs::setRombank(const unsigned bank)
    {
-      romdata_[1] = romdata() + bank * 0x4000ul - 0x4000;
+      EM_ASM_INT({
+           window.setRombank1($0,$1,$2,$3);
+         }, romdata(), bank, (bank*UNSIGNED_16KB) - _16KB,  romdata() + bank * UNSIGNED_16KB - _16KB);
+      romdata_[1] = romdata() + bank * UNSIGNED_16KB - _16KB;
       rmem_[0x7] = rmem_[0x6] = rmem_[0x5] = rmem_[0x4] = romdata_[1];
       disconnectOamDmaAreas();
    }

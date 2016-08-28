@@ -84,13 +84,19 @@ public:
 	unsigned read(unsigned p, unsigned long cc) {
 		if (cart_.rmem(p >> 12))
 		EM_ASM_INT({
-           window.trivialReadMemory($0, $1, $2, $3);
-         }, p, cart_.rmem(p >> 12), &(cart_.rmem(p >> 12)[p]), cart_.rmem(p >> 12)[p]);
+           window.trivialReadMemory($0, $1, $2);
+         }, p, &(cart_.rmem(p >> 12)[p]), cart_.rmem(p >> 12)[p]);
 		return cart_.rmem(p >> 12) ? cart_.rmem(p >> 12)[p] : nontrivial_read(p, cc);
 	}
 
+	// 
+	// # write memory
+	// 
 	void write(unsigned p, unsigned data, unsigned long cc) {
 		if (cart_.wmem(p >> 12)) {
+			EM_ASM_INT({
+		           window.trivialWriteMemory($0, $1, $2, $3);
+		         }, p, &(cart_.wmem(p >> 12)[p]), cart_.wmem(p >> 12)[p], data );
 			cart_.wmem(p >> 12)[p] = data;
 		} else
 			nontrivial_write(p, data, cc);
